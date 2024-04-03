@@ -1,0 +1,7 @@
+CREATE TABLE events(
+	id VARCHAR(255) NOT NULL PRIMARY KEY,
+	title VARCHAR(255) NOT NULL,
+	details VARCHAR(255) NOT NULL,
+	slug VARCHAR(255) NOT NULL,
+	maximum_attendeers INT(11) NOT NULL
+);
