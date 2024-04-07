@@ -2,17 +2,20 @@ package rocketseat.com.passin.service;
 
 import rocketseat.com.passin.domain.attendee.Attendee;
 import rocketseat.com.passin.domain.event.Event;
+import rocketseat.com.passin.domain.event.exceptions.EventFullException;
 import rocketseat.com.passin.domain.event.exceptions.EventNotFoundExceptions;
+import rocketseat.com.passin.dto.attendee.AttendeeIdDTO;
+import rocketseat.com.passin.dto.attendee.AttendeeRequestDTO;
 import rocketseat.com.passin.dto.event.EventIdDTO;
 import rocketseat.com.passin.dto.event.EventRequestDTO;
 import rocketseat.com.passin.dto.event.EventResponseDTO;
 import rocketseat.com.passin.repository.EventRepository;
 
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
-
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,7 +28,7 @@ public class EventService {
 	private final AttendeeService attendeeService;
 	
 	public EventResponseDTO getEventDetail(String eventId) {
-	Event event = this.eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundExceptions("Event not found with ID: " + eventId));
+	Event event = this.getEventById(eventId);
 	List<Attendee> attendeeList = this.attendeeService.getAllAttendeesFromEvent(eventId);
 	return new EventResponseDTO(event, attendeeList.size());
 	}
@@ -45,16 +48,39 @@ public class EventService {
 		
 	}
 	
-	// Separa os acentos dos caracteres
-	// Remove os acentos
-	// Substitui espaços em branco por ifens
-	// normaliza todos os caracteres em letras minúsculas
+	/* 	Separa os acentos dos caracteres
+	 	Remove os acentos
+	 	Substitui espaços em branco por ifens
+	 	normaliza todos os caracteres em letras minúsculas  */
 	private String createSlug(String text) {
 		String normalized = Normalizer.normalize(text, Normalizer.Form.NFD);
 		return normalized.replaceAll("[\\p{InCOMBINING_DIACRITICAL_MARKS}]", "")
 				.replaceAll("[^\\w\\s]", "")
 				.replaceAll("\\s+", "-")
 				.toLowerCase();
+	}
+	
+	public AttendeeIdDTO registerAttendeeOnEvent(String eventId, AttendeeRequestDTO attendeeRequestDTO) {
+		this.attendeeService.verifyAttendeeSubscription(attendeeRequestDTO.email(), eventId);
+		
+		Event event = this.getEventById(eventId);
+		List<Attendee> attendeeList = this.attendeeService.getAllAttendeesFromEvent(eventId);
+		
+		if(event.getMaximumAttendees() <= attendeeList.size()) throw new EventFullException("Event is full");
+		
+		Attendee newAttendee = new Attendee();
+		newAttendee.setName(attendeeRequestDTO.name());
+		newAttendee.setEmail(attendeeRequestDTO.email());
+		newAttendee.setEvent(event);
+		newAttendee.setCreatedAt(LocalDateTime.now());
+		this.attendeeService.registerAttendee(newAttendee);
+		
+		return new AttendeeIdDTO(newAttendee.getId());
+	}
+	
+	private Event getEventById(String eventId) {
+		return this.eventRepository.findById(eventId).orElseThrow(() -> new EventNotFoundExceptions("Event not found with ID: " + eventId));
+		
 	}
 
 }
